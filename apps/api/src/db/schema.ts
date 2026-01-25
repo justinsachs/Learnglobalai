@@ -77,6 +77,201 @@ export const chatMessageRoleEnum = pgEnum('chat_message_role', [
   'system',
 ]);
 
+export const learningStyleEnum = pgEnum('learning_style', [
+  'visual',
+  'text',
+  'interactive',
+  'audio',
+  'mixed',
+]);
+
+export const moduleTypeEnum = pgEnum('module_type', [
+  'standard',
+  'simulation',
+  'assessment',
+  'interactive',
+  'video',
+]);
+
+// ==========================================
+// User & Learner Tables
+// ==========================================
+
+/**
+ * Users - Platform users (learners, admins, content creators)
+ */
+export const users = pgTable(
+  'users',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: varchar('user_id', { length: 255 }).notNull().unique(),
+    email: varchar('email', { length: 255 }).notNull().unique(),
+    displayName: varchar('display_name', { length: 255 }).notNull(),
+    vertical: varchar('vertical', { length: 100 }).notNull(),
+    role: varchar('role', { length: 50 }).notNull().default('learner'),
+    passwordHash: varchar('password_hash', { length: 255 }),
+    avatarUrl: text('avatar_url'),
+    preferences: jsonb('preferences').$type<Record<string, unknown>>().default({}),
+    lastLoginAt: timestamp('last_login_at'),
+    onboardingCompleted: boolean('onboarding_completed').notNull().default(false),
+    active: boolean('active').notNull().default(true),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    emailIdx: uniqueIndex('users_email_idx').on(table.email),
+    userIdIdx: uniqueIndex('users_user_id_idx').on(table.userId),
+    verticalIdx: index('users_vertical_idx').on(table.vertical),
+  })
+);
+
+/**
+ * Learner Profiles - Extended profile for adaptive learning
+ * This is the "Brain" that stores learning preferences and goals
+ */
+export const learnerProfiles = pgTable(
+  'learner_profiles',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' })
+      .unique(),
+    currentRole: varchar('current_role', { length: 255 }).notNull(),
+    learningStyle: learningStyleEnum('learning_style').notNull().default('mixed'),
+    primaryGoal: text('primary_goal').notNull(),
+    secondaryGoals: jsonb('secondary_goals').$type<string[]>().default([]),
+    riskTolerance: integer('risk_tolerance').notNull().default(5), // 1-10 scale
+    experienceLevel: varchar('experience_level', { length: 50 }).notNull().default('intermediate'),
+    timeAvailability: varchar('time_availability', { length: 50 }).notNull().default('moderate'), // limited, moderate, flexible
+    preferredSessionLength: integer('preferred_session_length').notNull().default(30), // minutes
+    industryBackground: varchar('industry_background', { length: 255 }),
+    certifications: jsonb('certifications').$type<string[]>().default([]),
+    strengthAreas: jsonb('strength_areas').$type<string[]>().default([]),
+    improvementAreas: jsonb('improvement_areas').$type<string[]>().default([]),
+    quizResponses: jsonb('quiz_responses').$type<Record<string, unknown>>().default({}),
+    adaptiveSettings: jsonb('adaptive_settings').$type<{
+      contentDensity: 'light' | 'moderate' | 'dense';
+      exampleFrequency: 'few' | 'moderate' | 'many';
+      quizDifficulty: 'easy' | 'medium' | 'hard' | 'adaptive';
+      feedbackStyle: 'brief' | 'detailed' | 'encouraging';
+    }>().default({
+      contentDensity: 'moderate',
+      exampleFrequency: 'moderate',
+      quizDifficulty: 'adaptive',
+      feedbackStyle: 'detailed',
+    }),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdx: uniqueIndex('learner_profiles_user_idx').on(table.userId),
+    roleIdx: index('learner_profiles_role_idx').on(table.currentRole),
+    styleIdx: index('learner_profiles_style_idx').on(table.learningStyle),
+  })
+);
+
+/**
+ * Module Progress - Tracks learner progress through modules
+ */
+export const moduleProgress = pgTable(
+  'module_progress',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    moduleId: uuid('module_id')
+      .notNull()
+      .references(() => modules.id, { onDelete: 'cascade' }),
+    status: varchar('status', { length: 50 }).notNull().default('not_started'),
+    progressPercent: integer('progress_percent').notNull().default(0),
+    currentSection: varchar('current_section', { length: 255 }),
+    completedSections: jsonb('completed_sections').$type<string[]>().default([]),
+    timeSpentMinutes: integer('time_spent_minutes').notNull().default(0),
+    lastAccessedAt: timestamp('last_accessed_at'),
+    startedAt: timestamp('started_at'),
+    completedAt: timestamp('completed_at'),
+    score: integer('score'),
+    attempts: integer('attempts').notNull().default(0),
+    bookmarks: jsonb('bookmarks').$type<Array<{
+      sectionId: string;
+      note?: string;
+      createdAt: string;
+    }>>().default([]),
+    notes: jsonb('notes').$type<Array<{
+      sectionId: string;
+      content: string;
+      createdAt: string;
+    }>>().default([]),
+    adaptiveHistory: jsonb('adaptive_history').$type<Array<{
+      timestamp: string;
+      action: string;
+      context: Record<string, unknown>;
+    }>>().default([]),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    userModuleIdx: uniqueIndex('module_progress_user_module_idx').on(
+      table.userId,
+      table.moduleId
+    ),
+    userIdx: index('module_progress_user_idx').on(table.userId),
+    moduleIdx: index('module_progress_module_idx').on(table.moduleId),
+    statusIdx: index('module_progress_status_idx').on(table.status),
+  })
+);
+
+/**
+ * Simulation Sessions - Tracks simulation (Case 7 style) interactions
+ */
+export const simulationSessions = pgTable(
+  'simulation_sessions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    sessionId: varchar('session_id', { length: 255 }).notNull().unique(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    moduleId: uuid('module_id')
+      .notNull()
+      .references(() => modules.id, { onDelete: 'cascade' }),
+    scenarioId: varchar('scenario_id', { length: 255 }).notNull(),
+    scenarioTitle: varchar('scenario_title', { length: 500 }).notNull(),
+    status: varchar('status', { length: 50 }).notNull().default('in_progress'),
+    decisions: jsonb('decisions').$type<Array<{
+      stepId: string;
+      decision: string;
+      timestamp: string;
+      outcome: string;
+      score: number;
+      feedback: string;
+    }>>().default([]),
+    currentStep: varchar('current_step', { length: 255 }),
+    totalSteps: integer('total_steps').notNull().default(0),
+    completedSteps: integer('completed_steps').notNull().default(0),
+    score: integer('score'),
+    maxScore: integer('max_score'),
+    timeSpentMinutes: integer('time_spent_minutes').notNull().default(0),
+    outcomes: jsonb('outcomes').$type<{
+      success: boolean;
+      summary: string;
+      learningPoints: string[];
+      areasToImprove: string[];
+    }>(),
+    startedAt: timestamp('started_at').notNull().defaultNow(),
+    completedAt: timestamp('completed_at'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    sessionIdIdx: uniqueIndex('simulation_sessions_session_id_idx').on(table.sessionId),
+    userIdx: index('simulation_sessions_user_idx').on(table.userId),
+    moduleIdx: index('simulation_sessions_module_idx').on(table.moduleId),
+    scenarioIdx: index('simulation_sessions_scenario_idx').on(table.scenarioId),
+  })
+);
+
 // ==========================================
 // Core Tables
 // ==========================================
@@ -95,8 +290,25 @@ export const modules = pgTable(
     currentVersion: varchar('current_version', { length: 50 }).notNull().default('1.0.0'),
     author: varchar('author', { length: 255 }).notNull(),
     status: varchar('status', { length: 50 }).notNull().default('draft'),
+    moduleType: moduleTypeEnum('module_type').notNull().default('standard'),
+    pillar: varchar('pillar', { length: 100 }), // e.g., "Pillar 1: Safety Fundamentals"
+    orderIndex: integer('order_index').notNull().default(0),
+    estimatedMinutes: integer('estimated_minutes').notNull().default(30),
+    prerequisites: jsonb('prerequisites').$type<string[]>().default([]),
+    learningObjectives: jsonb('learning_objectives').$type<string[]>().default([]),
     tags: jsonb('tags').$type<string[]>().default([]),
     metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
+    simulationConfig: jsonb('simulation_config').$type<{
+      scenarioId: string;
+      title: string;
+      description: string;
+      steps: Array<{
+        id: string;
+        prompt: string;
+        options: Array<{ id: string; text: string; score: number; feedback: string }>;
+      }>;
+      passingScore: number;
+    }>(),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
     deletedAt: timestamp('deleted_at'),
@@ -105,6 +317,9 @@ export const modules = pgTable(
     verticalIdx: index('modules_vertical_idx').on(table.vertical),
     statusIdx: index('modules_status_idx').on(table.status),
     moduleIdIdx: uniqueIndex('modules_module_id_idx').on(table.moduleId),
+    moduleTypeIdx: index('modules_type_idx').on(table.moduleType),
+    pillarIdx: index('modules_pillar_idx').on(table.pillar),
+    orderIdx: index('modules_order_idx').on(table.vertical, table.orderIndex),
   })
 );
 
@@ -471,12 +686,51 @@ export const approvals = pgTable(
 // Relations
 // ==========================================
 
+// User Relations
+export const usersRelations = relations(users, ({ one, many }) => ({
+  learnerProfile: one(learnerProfiles),
+  moduleProgress: many(moduleProgress),
+  simulationSessions: many(simulationSessions),
+  chatMessages: many(chatMessages),
+}));
+
+export const learnerProfilesRelations = relations(learnerProfiles, ({ one }) => ({
+  user: one(users, {
+    fields: [learnerProfiles.userId],
+    references: [users.id],
+  }),
+}));
+
+export const moduleProgressRelations = relations(moduleProgress, ({ one }) => ({
+  user: one(users, {
+    fields: [moduleProgress.userId],
+    references: [users.id],
+  }),
+  module: one(modules, {
+    fields: [moduleProgress.moduleId],
+    references: [modules.id],
+  }),
+}));
+
+export const simulationSessionsRelations = relations(simulationSessions, ({ one }) => ({
+  user: one(users, {
+    fields: [simulationSessions.userId],
+    references: [users.id],
+  }),
+  module: one(modules, {
+    fields: [simulationSessions.moduleId],
+    references: [modules.id],
+  }),
+}));
+
 export const modulesRelations = relations(modules, ({ many }) => ({
   specs: many(moduleSpecs),
   runs: many(runs),
   chatConfigs: many(chatConfigs),
   chatMessages: many(chatMessages),
   auditEvents: many(auditEvents),
+  progress: many(moduleProgress),
+  simulationSessions: many(simulationSessions),
 }));
 
 export const moduleSpecsRelations = relations(moduleSpecs, ({ one, many }) => ({

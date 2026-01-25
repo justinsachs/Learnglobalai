@@ -16,6 +16,7 @@ import { moduleRoutes } from './routes/modules.js';
 import { chatRoutes } from './routes/chat.js';
 import { approvalRoutes } from './routes/approvals.js';
 import { verticalRoutes } from './routes/verticals.js';
+import { learnerRoutes } from './routes/learners.js';
 import { startWorker, stopWorker } from './queue/worker.js';
 import { closeQueue } from './queue/index.js';
 import { metricsHandler, trackHttpRequest } from './utils/metrics.js';
@@ -84,6 +85,7 @@ async function main() {
         { name: 'chat', description: 'Module chat' },
         { name: 'approvals', description: 'Approval workflow' },
         { name: 'verticals', description: 'Vertical/brand configuration' },
+        { name: 'learners', description: 'Learner profiling and adaptive learning' },
         { name: 'admin', description: 'Admin operations' },
       ],
       components: {
@@ -164,6 +166,7 @@ async function main() {
   await fastify.register(chatRoutes, { prefix: '/api/v1' });
   await fastify.register(approvalRoutes, { prefix: '/api/v1' });
   await fastify.register(verticalRoutes, { prefix: '/api/v1' });
+  await fastify.register(learnerRoutes, { prefix: '/api/v1/learners' });
 
   // Error handler
   fastify.setErrorHandler((error, request, reply) => {

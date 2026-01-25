@@ -73,7 +73,7 @@ export async function verticalRoutes(fastify: FastifyInstance): Promise<void> {
    */
   fastify.get('/verticals', async (request: FastifyRequest, reply: FastifyReply) => {
     const verticals = await db.query.verticalConfigs.findMany({
-      orderBy: (verticalConfigs, { asc }) => [asc(verticalConfigs.name)],
+      orderBy: (verticalConfigs, { asc }) => [asc(verticalConfigs.displayName)],
     });
 
     return reply.send({
@@ -89,7 +89,7 @@ export async function verticalRoutes(fastify: FastifyInstance): Promise<void> {
     const { verticalId } = request.params;
 
     const vertical = await db.query.verticalConfigs.findFirst({
-      where: eq(schema.verticalConfigs.verticalId, verticalId),
+      where: eq(schema.verticalConfigs.vertical, verticalId),
     });
 
     if (!vertical) {
@@ -113,7 +113,7 @@ export async function verticalRoutes(fastify: FastifyInstance): Promise<void> {
 
     // Check for existing vertical
     const existing = await db.query.verticalConfigs.findFirst({
-      where: eq(schema.verticalConfigs.verticalId, verticalId),
+      where: eq(schema.verticalConfigs.vertical, verticalId),
     });
 
     if (existing) {
@@ -159,12 +159,12 @@ export async function verticalRoutes(fastify: FastifyInstance): Promise<void> {
     };
 
     const [vertical] = await db.insert(schema.verticalConfigs).values({
-      verticalId,
-      name,
+      vertical: verticalId,
+      displayName: name,
       config: fullConfig,
     }).returning();
 
-    logger.info('Vertical created', { verticalId, name });
+    logger.info('Vertical created', { vertical: verticalId, name });
 
     return reply.status(201).send({
       success: true,
@@ -180,7 +180,7 @@ export async function verticalRoutes(fastify: FastifyInstance): Promise<void> {
     const { name, config } = request.body;
 
     const existing = await db.query.verticalConfigs.findFirst({
-      where: eq(schema.verticalConfigs.verticalId, verticalId),
+      where: eq(schema.verticalConfigs.vertical, verticalId),
     });
 
     if (!existing) {
@@ -198,7 +198,7 @@ export async function verticalRoutes(fastify: FastifyInstance): Promise<void> {
 
     await db.update(schema.verticalConfigs)
       .set({
-        name: name || existing.name,
+        displayName: name || existing.displayName,
         config: mergedConfig,
         updatedAt: new Date(),
       })
@@ -223,7 +223,7 @@ export async function verticalRoutes(fastify: FastifyInstance): Promise<void> {
     const { verticalId } = request.params;
 
     const existing = await db.query.verticalConfigs.findFirst({
-      where: eq(schema.verticalConfigs.verticalId, verticalId),
+      where: eq(schema.verticalConfigs.vertical, verticalId),
     });
 
     if (!existing) {
@@ -264,7 +264,7 @@ export async function verticalRoutes(fastify: FastifyInstance): Promise<void> {
     const { newVerticalId, newName } = request.body;
 
     const existing = await db.query.verticalConfigs.findFirst({
-      where: eq(schema.verticalConfigs.verticalId, verticalId),
+      where: eq(schema.verticalConfigs.vertical, verticalId),
     });
 
     if (!existing) {
@@ -276,7 +276,7 @@ export async function verticalRoutes(fastify: FastifyInstance): Promise<void> {
 
     // Check if new vertical ID is available
     const newExisting = await db.query.verticalConfigs.findFirst({
-      where: eq(schema.verticalConfigs.verticalId, newVerticalId),
+      where: eq(schema.verticalConfigs.vertical, newVerticalId),
     });
 
     if (newExisting) {
@@ -287,8 +287,8 @@ export async function verticalRoutes(fastify: FastifyInstance): Promise<void> {
     }
 
     const [cloned] = await db.insert(schema.verticalConfigs).values({
-      verticalId: newVerticalId,
-      name: newName,
+      vertical: newVerticalId,
+      displayName: newName,
       config: existing.config,
     }).returning();
 
@@ -307,7 +307,7 @@ export async function verticalRoutes(fastify: FastifyInstance): Promise<void> {
     const { verticalId } = request.params;
 
     const vertical = await db.query.verticalConfigs.findFirst({
-      where: eq(schema.verticalConfigs.verticalId, verticalId),
+      where: eq(schema.verticalConfigs.vertical, verticalId),
     });
 
     if (!vertical) {
@@ -341,7 +341,7 @@ export async function verticalRoutes(fastify: FastifyInstance): Promise<void> {
     }
 
     const existing = await db.query.verticalConfigs.findFirst({
-      where: eq(schema.verticalConfigs.verticalId, verticalId),
+      where: eq(schema.verticalConfigs.vertical, verticalId),
     });
 
     if (!existing) {

@@ -1,6 +1,6 @@
 /**
  * Chat API Routes
- * Module-scoped chat with RAG
+ * Module-scoped chat with RAG and Adaptive Learning Context
  */
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
@@ -18,6 +18,100 @@ interface ChatMessageBody {
   conversationId?: string;
   sessionId: string;
   userId?: string;
+}
+
+/**
+ * Generate adaptive context for AI personalization
+ * This is injected into the AI system prompt based on learner profile
+ */
+function generateAdaptiveContext(profile: typeof schema.learnerProfiles.$inferSelect): string {
+  const parts: string[] = [];
+
+  // Role-based context
+  parts.push(`The learner is a ${profile.currentRole}.`);
+
+  // Learning style
+  const styleGuides: Record<string, string> = {
+    visual: 'Use diagrams, charts, and visual examples when explaining concepts.',
+    text: 'Provide detailed written explanations with clear structure.',
+    interactive: 'Suggest hands-on activities and interactive exercises.',
+    audio: 'Structure content as if explaining verbally, with clear narrative flow.',
+    mixed: 'Balance visual, textual, and interactive elements.',
+  };
+  parts.push(styleGuides[profile.learningStyle] || styleGuides.mixed);
+
+  // Goal context
+  parts.push(`Their primary learning goal is: "${profile.primaryGoal}".`);
+
+  // Experience level
+  const levelGuides: Record<string, string> = {
+    beginner: 'Explain fundamental concepts and avoid jargon. Provide more context.',
+    intermediate: 'Assume basic knowledge. Focus on practical applications.',
+    advanced: 'Use technical terminology freely. Focus on nuances and edge cases.',
+  };
+  parts.push(levelGuides[profile.experienceLevel] || levelGuides.intermediate);
+
+  // Risk tolerance
+  if (profile.riskTolerance <= 3) {
+    parts.push('The learner prefers cautious, conservative approaches. Emphasize safety and verification.');
+  } else if (profile.riskTolerance >= 7) {
+    parts.push('The learner is comfortable with calculated risks. Include innovative approaches.');
+  }
+
+  // Session length preferences
+  if (profile.preferredSessionLength <= 15) {
+    parts.push('Keep responses concise and focused. The learner prefers short sessions.');
+  } else if (profile.preferredSessionLength >= 45) {
+    parts.push('Feel free to provide comprehensive, detailed responses.');
+  }
+
+  // Adaptive settings
+  const settings = profile.adaptiveSettings as {
+    contentDensity?: string;
+    exampleFrequency?: string;
+    quizDifficulty?: string;
+    feedbackStyle?: string;
+  } | null;
+
+  if (settings?.feedbackStyle === 'encouraging') {
+    parts.push('Use encouraging, supportive language when providing feedback.');
+  } else if (settings?.feedbackStyle === 'brief') {
+    parts.push('Keep feedback concise and actionable.');
+  }
+
+  if (settings?.exampleFrequency === 'many') {
+    parts.push('Include multiple practical examples to illustrate concepts.');
+  } else if (settings?.exampleFrequency === 'few') {
+    parts.push('Be judicious with examples; focus on key concepts.');
+  }
+
+  return parts.join(' ');
+}
+
+/**
+ * Get learner profile and generate adaptive context
+ */
+async function getLearnerAdaptiveContext(
+  userId: string | undefined,
+  db: ReturnType<typeof getDatabase>
+): Promise<string | null> {
+  if (!userId) return null;
+
+  try {
+    const user = await db.query.users.findFirst({
+      where: eq(schema.users.userId, userId),
+      with: {
+        learnerProfile: true,
+      },
+    });
+
+    if (!user?.learnerProfile) return null;
+
+    return generateAdaptiveContext(user.learnerProfile);
+  } catch (error) {
+    logger.warn('Failed to get learner adaptive context', { userId, error });
+    return null;
+  }
 }
 
 // Cache chat services per module
@@ -200,13 +294,21 @@ export async function chatRoutes(fastify: FastifyInstance): Promise<void> {
     });
 
     try {
-      // Process message through chat service with RAG
+      // Get adaptive learning context for personalization
+      const adaptiveContext = await getLearnerAdaptiveContext(userId, db);
+
+      // Process message through chat service with RAG and adaptive context
       const response = await chatService.processMessage({
         moduleId,
         message,
         conversationId: msgConversationId,
         sessionId,
         userId,
+        // Inject adaptive context for personalized responses
+        additionalContext: adaptiveContext ? {
+          learnerProfile: adaptiveContext,
+          personalizationEnabled: true,
+        } : undefined,
       });
 
       // Store assistant message
@@ -228,6 +330,7 @@ export async function chatRoutes(fastify: FastifyInstance): Promise<void> {
         conversationId: msgConversationId,
         messageId: response.messageId,
         citationCount: response.citations.length,
+        personalized: !!adaptiveContext,
       });
 
       return reply.send({
