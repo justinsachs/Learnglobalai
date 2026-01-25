@@ -6,6 +6,7 @@
 
 export * from './types.js';
 export { OpenAIProvider } from './providers/openai.js';
+export * from './agents/index.js';
 
 import { OpenAIProvider } from './providers/openai.js';
 import type { LLMProvider, LLMConfig } from './types.js';

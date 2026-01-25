@@ -5,6 +5,7 @@
 
 import { Worker, Job } from 'bullmq';
 import { eq } from 'drizzle-orm';
+import { createHash } from 'crypto';
 import { PipelineState } from '@learnglobal/contracts';
 import { createOrchestrator, createRunContext, type OrchestratorDependencies, type RunContext } from '@learnglobal/orchestrator';
 import { createLLMProvider } from '@learnglobal/llm';
@@ -19,6 +20,43 @@ import { getDatabase } from '../db/connection.js';
 import * as schema from '../db/schema.js';
 import { loadConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
+
+/**
+ * Compute SHA-256 hash of content
+ */
+function computeContentHash(data: unknown): string {
+  const json = JSON.stringify(data);
+  return createHash('sha256').update(json).digest('hex');
+}
+
+/**
+ * Generate storage path for an artifact
+ */
+function generateStoragePath(runId: string, artifactType: string, artifactId: string): string {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  return `artifacts/${year}/${month}/${runId}/${artifactType}/${artifactId}.json`;
+}
+
+/**
+ * Track state transition timing
+ */
+const stateTransitionTimestamps = new Map<string, number>();
+
+function recordStateStart(runId: string, state: string): void {
+  stateTransitionTimestamps.set(`${runId}:${state}`, Date.now());
+}
+
+function getStateDuration(runId: string, state: string): number {
+  const startTime = stateTransitionTimestamps.get(`${runId}:${state}`);
+  if (startTime) {
+    const duration = Date.now() - startTime;
+    stateTransitionTimestamps.delete(`${runId}:${state}`);
+    return duration;
+  }
+  return 0;
+}
 
 let worker: Worker<PipelineJobData> | null = null;
 
@@ -77,13 +115,16 @@ function createDependencies(): OrchestratorDependencies {
       if (!run) throw new Error(`Run not found: ${runId}`);
 
       const artifactId = `art-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+      const contentHash = computeContentHash(data);
+      const storagePath = generateStoragePath(runId, type, artifactId);
+
       await db.insert(schema.artifacts).values({
         artifactId,
         runId: run.id,
         artifactType: type as any,
         data: data as any,
-        contentHash: '',
-        storagePath: '',
+        contentHash,
+        storagePath,
       });
       return artifactId;
     },
@@ -172,6 +213,16 @@ function createDependencies(): OrchestratorDependencies {
         throw new Error(`Run not found: ${context.runId}`);
       }
 
+      // Record start time for the new state
+      if (context.currentState) {
+        recordStateStart(context.runId, context.currentState);
+      }
+
+      // Calculate duration for the previous state
+      const durationMs = context.previousState
+        ? getStateDuration(context.runId, context.previousState)
+        : 0;
+
       // Update run record
       await db.update(schema.runs)
         .set({
@@ -189,7 +240,7 @@ function createDependencies(): OrchestratorDependencies {
         fromState: context.previousState,
         toState: context.currentState,
         actor: 'orchestrator',
-        durationMs: 0, // TODO: Calculate actual duration
+        durationMs,
         artifacts: context.checkpoint?.artifactHashes,
       });
 
@@ -313,9 +364,21 @@ async function saveArtifact(
   artifactType: string,
   data: unknown
 ): Promise<void> {
-  const existingArtifact = await db.query.artifacts.findFirst({
-    where: eq(schema.artifacts.runId, runId),
+  // Get the run to retrieve the runId string
+  const run = await db.query.runs.findFirst({
+    where: eq(schema.runs.id, runId),
   });
+
+  const runIdStr = run?.runId || `run-${runId}`;
+
+  // Compute content hash
+  const contentHash = computeContentHash(data);
+
+  // Generate artifact ID
+  const artifactId = `art-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+
+  // Generate storage path
+  const storagePath = generateStoragePath(runIdStr, artifactType, artifactId);
 
   // Check if artifact of this type already exists for this run
   const existing = await db.select()
@@ -323,25 +386,27 @@ async function saveArtifact(
     .where(eq(schema.artifacts.runId, runId))
     .execute();
 
-  const artifactExists = existing.some(a => a.artifactType === artifactType);
+  const existingArtifact = existing.find(a => a.artifactType === artifactType);
 
-  if (artifactExists) {
+  if (existingArtifact) {
     // Update existing artifact
     await db.update(schema.artifacts)
       .set({
         data: data as any,
+        contentHash,
+        storagePath,
         updatedAt: new Date(),
       })
-      .where(eq(schema.artifacts.runId, runId));
+      .where(eq(schema.artifacts.id, existingArtifact.id));
   } else {
     // Insert new artifact
     await db.insert(schema.artifacts).values({
-      artifactId: `art-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
+      artifactId,
       runId,
       artifactType: artifactType as any,
       data: data as any,
-      contentHash: '', // TODO: Calculate hash
-      storagePath: '', // TODO: Set storage path
+      contentHash,
+      storagePath,
     });
   }
 }

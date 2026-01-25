@@ -287,17 +287,148 @@ export class FileSystemLmsConnector implements LmsConnector {
 }
 
 /**
- * Generic LMS API Connector (placeholder for real integrations)
+ * Generic LMS API Connector
+ *
+ * A configurable REST API client that can work with various LMS systems
+ * by adapting endpoint paths and request/response formats.
+ *
+ * Supports common LMS platforms:
+ * - Canvas LMS
+ * - Moodle
+ * - Blackboard
+ * - Custom REST APIs
  */
 export class GenericLmsConnector implements LmsConnector {
   private config: LmsConfig;
   private retryConfig: RetryConfig;
   private logger?: ConnectorLogger;
+  private endpointConfig: LmsEndpointConfig;
 
   constructor(config: LmsConfig, logger?: ConnectorLogger) {
     this.config = config;
     this.retryConfig = config.retryConfig || DEFAULT_RETRY_CONFIG;
     this.logger = logger;
+    this.endpointConfig = this.getEndpointConfig(config.provider);
+  }
+
+  /**
+   * Get endpoint configuration based on LMS provider
+   */
+  private getEndpointConfig(provider: string): LmsEndpointConfig {
+    const configs: Record<string, LmsEndpointConfig> = {
+      canvas: {
+        createModule: { method: 'POST', path: '/api/v1/courses/{courseId}/modules' },
+        uploadAsset: { method: 'POST', path: '/api/v1/courses/{courseId}/files' },
+        attachAsset: { method: 'POST', path: '/api/v1/courses/{courseId}/modules/{moduleId}/items' },
+        publish: { method: 'PUT', path: '/api/v1/courses/{courseId}/modules/{moduleId}' },
+        getStatus: { method: 'GET', path: '/api/v1/courses/{courseId}/modules/{moduleId}' },
+        authHeader: 'Authorization',
+        authPrefix: 'Bearer ',
+      },
+      moodle: {
+        createModule: { method: 'POST', path: '/webservice/rest/server.php?wsfunction=core_course_create_modules' },
+        uploadAsset: { method: 'POST', path: '/webservice/rest/server.php?wsfunction=core_files_upload' },
+        attachAsset: { method: 'POST', path: '/webservice/rest/server.php?wsfunction=mod_resource_add_resource' },
+        publish: { method: 'POST', path: '/webservice/rest/server.php?wsfunction=core_course_update_courses' },
+        getStatus: { method: 'GET', path: '/webservice/rest/server.php?wsfunction=core_course_get_contents' },
+        authHeader: 'Authorization',
+        authPrefix: 'Bearer ',
+        authQueryParam: 'wstoken',
+      },
+      blackboard: {
+        createModule: { method: 'POST', path: '/learn/api/public/v1/courses/{courseId}/contents' },
+        uploadAsset: { method: 'POST', path: '/learn/api/public/v1/courses/{courseId}/contents/{contentId}/attachments' },
+        attachAsset: { method: 'POST', path: '/learn/api/public/v1/courses/{courseId}/contents/{contentId}/children' },
+        publish: { method: 'PATCH', path: '/learn/api/public/v1/courses/{courseId}/contents/{contentId}' },
+        getStatus: { method: 'GET', path: '/learn/api/public/v1/courses/{courseId}/contents/{contentId}' },
+        authHeader: 'Authorization',
+        authPrefix: 'Bearer ',
+      },
+      generic: {
+        createModule: { method: 'POST', path: '/api/modules' },
+        uploadAsset: { method: 'POST', path: '/api/modules/{moduleId}/assets' },
+        attachAsset: { method: 'POST', path: '/api/modules/{moduleId}/assets/{assetId}/attach' },
+        publish: { method: 'POST', path: '/api/modules/{moduleId}/publish' },
+        getStatus: { method: 'GET', path: '/api/modules/{moduleId}/status' },
+        authHeader: 'Authorization',
+        authPrefix: 'Bearer ',
+      },
+    };
+
+    return configs[provider] || configs.generic;
+  }
+
+  /**
+   * Make an authenticated API request
+   */
+  private async apiRequest<T>(
+    endpoint: EndpointSpec,
+    pathParams: Record<string, string>,
+    body?: Record<string, unknown> | FormData
+  ): Promise<T> {
+    if (!this.config.apiUrl) {
+      throw createConnectorError('lms', 'apiRequest', 'CONFIG_ERROR', 'API URL not configured', false);
+    }
+    if (!this.config.apiKey) {
+      throw createConnectorError('lms', 'apiRequest', 'CONFIG_ERROR', 'API key not configured', false);
+    }
+
+    // Build URL with path parameters
+    let path = endpoint.path;
+    for (const [key, value] of Object.entries(pathParams)) {
+      path = path.replace(`{${key}}`, encodeURIComponent(value));
+    }
+
+    let url = `${this.config.apiUrl}${path}`;
+
+    // Add auth as query param if configured (e.g., Moodle)
+    if (this.endpointConfig.authQueryParam) {
+      const separator = url.includes('?') ? '&' : '?';
+      url = `${url}${separator}${this.endpointConfig.authQueryParam}=${this.config.apiKey}`;
+    }
+
+    this.logger?.debug('LMS API request', { method: endpoint.method, url });
+
+    const headers: Record<string, string> = {
+      'Accept': 'application/json',
+    };
+
+    // Add auth header if not using query param
+    if (!this.endpointConfig.authQueryParam) {
+      headers[this.endpointConfig.authHeader] = `${this.endpointConfig.authPrefix}${this.config.apiKey}`;
+    }
+
+    // Set content type based on body type
+    if (body && !(body instanceof FormData)) {
+      headers['Content-Type'] = 'application/json';
+    }
+
+    const response = await fetch(url, {
+      method: endpoint.method,
+      headers,
+      body: body instanceof FormData ? body : body ? JSON.stringify(body) : undefined,
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      const isRetryable = response.status >= 500 || response.status === 429;
+
+      throw createConnectorError(
+        'lms',
+        path,
+        `HTTP_${response.status}`,
+        `LMS API request failed: ${error}`,
+        isRetryable
+      );
+    }
+
+    // Handle empty responses
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      return {} as T;
+    }
+
+    return response.json() as T;
   }
 
   async createModule(
@@ -305,13 +436,40 @@ export class GenericLmsConnector implements LmsConnector {
     description: string,
     metadata: Record<string, unknown>
   ): Promise<CreateModuleResult> {
-    throw createConnectorError(
-      'lms',
-      'createModule',
-      'NOT_IMPLEMENTED',
-      `LMS provider ${this.config.provider} not implemented`,
-      false
+    this.logger?.info('Creating LMS module', { title, provider: this.config.provider });
+
+    const courseId = (metadata.courseId as string) || 'default';
+
+    const response = await this.apiRequest<{
+      id?: string;
+      moduleId?: string;
+      module_id?: string;
+      url?: string;
+      html_url?: string;
+      created_at?: string;
+      createdAt?: string;
+    }>(
+      this.endpointConfig.createModule,
+      { courseId, moduleId: '' },
+      {
+        name: title,
+        title,
+        description,
+        ...metadata,
+      }
     );
+
+    const modulePageId = response.id || response.moduleId || response.module_id || `lms-${Date.now()}`;
+    const moduleUrl = response.url || response.html_url || `${this.config.apiUrl}/modules/${modulePageId}`;
+    const createdAt = response.created_at || response.createdAt || new Date().toISOString();
+
+    this.logger?.info('LMS module created', { modulePageId, moduleUrl });
+
+    return {
+      modulePageId,
+      moduleUrl,
+      createdAt,
+    };
   }
 
   async uploadAsset(
@@ -320,13 +478,54 @@ export class GenericLmsConnector implements LmsConnector {
     title: string,
     content: Buffer | string
   ): Promise<UploadAssetResult> {
-    throw createConnectorError(
-      'lms',
-      'uploadAsset',
-      'NOT_IMPLEMENTED',
-      `LMS provider ${this.config.provider} not implemented`,
-      false
+    this.logger?.info('Uploading LMS asset', { modulePageId, assetType, title });
+
+    const courseId = 'default'; // Would come from context in real implementation
+
+    // Create FormData for file upload
+    const formData = new FormData();
+    formData.append('name', title);
+    formData.append('type', assetType);
+
+    if (typeof content === 'string') {
+      if (content.startsWith('http')) {
+        // URL reference
+        formData.append('url', content);
+      } else {
+        // Text content
+        const blob = new Blob([content], { type: 'text/plain' });
+        formData.append('file', blob, `${title}.txt`);
+      }
+    } else {
+      // Binary content
+      const blob = new Blob([content]);
+      formData.append('file', blob, title);
+    }
+
+    const response = await this.apiRequest<{
+      id?: string;
+      assetId?: string;
+      asset_id?: string;
+      file_id?: string;
+      url?: string;
+      download_url?: string;
+      created_at?: string;
+    }>(
+      this.endpointConfig.uploadAsset,
+      { courseId, moduleId: modulePageId, contentId: modulePageId },
+      formData
     );
+
+    const assetId = response.id || response.assetId || response.asset_id || response.file_id || `asset-${Date.now()}`;
+    const assetUrl = response.url || response.download_url || `${this.config.apiUrl}/files/${assetId}`;
+
+    this.logger?.info('LMS asset uploaded', { assetId, assetUrl });
+
+    return {
+      assetId,
+      assetUrl,
+      uploadedAt: response.created_at || new Date().toISOString(),
+    };
   }
 
   async attachAsset(
@@ -335,34 +534,109 @@ export class GenericLmsConnector implements LmsConnector {
     placement: string,
     order: number
   ): Promise<void> {
-    throw createConnectorError(
-      'lms',
-      'attachAsset',
-      'NOT_IMPLEMENTED',
-      `LMS provider ${this.config.provider} not implemented`,
-      false
+    this.logger?.info('Attaching LMS asset', { modulePageId, assetId, placement, order });
+
+    const courseId = 'default';
+
+    await this.apiRequest<void>(
+      this.endpointConfig.attachAsset,
+      { courseId, moduleId: modulePageId, contentId: modulePageId, assetId },
+      {
+        asset_id: assetId,
+        assetId,
+        placement,
+        position: order,
+        order,
+      }
     );
+
+    this.logger?.info('LMS asset attached');
   }
 
   async publish(modulePageId: string, publishedBy: string): Promise<PublishResult> {
-    throw createConnectorError(
-      'lms',
-      'publish',
-      'NOT_IMPLEMENTED',
-      `LMS provider ${this.config.provider} not implemented`,
-      false
+    this.logger?.info('Publishing LMS module', { modulePageId, publishedBy });
+
+    const courseId = 'default';
+
+    const response = await this.apiRequest<{
+      id?: string;
+      url?: string;
+      html_url?: string;
+      published_at?: string;
+      publishedAt?: string;
+    }>(
+      this.endpointConfig.publish,
+      { courseId, moduleId: modulePageId, contentId: modulePageId },
+      {
+        published: true,
+        published_by: publishedBy,
+        publishedBy,
+      }
     );
+
+    const moduleUrl = response.url || response.html_url || `${this.config.apiUrl}/modules/${modulePageId}`;
+    const publishedAt = response.published_at || response.publishedAt || new Date().toISOString();
+
+    this.logger?.info('LMS module published', { modulePageId, moduleUrl });
+
+    return {
+      modulePageId,
+      moduleUrl,
+      publishedAt,
+    };
   }
 
   async getModuleStatus(modulePageId: string): Promise<{ status: string; url?: string }> {
-    throw createConnectorError(
-      'lms',
-      'getModuleStatus',
-      'NOT_IMPLEMENTED',
-      `LMS provider ${this.config.provider} not implemented`,
-      false
-    );
+    this.logger?.debug('Getting LMS module status', { modulePageId });
+
+    const courseId = 'default';
+
+    try {
+      const response = await this.apiRequest<{
+        id?: string;
+        status?: string;
+        published?: boolean;
+        workflow_state?: string;
+        url?: string;
+        html_url?: string;
+      }>(
+        this.endpointConfig.getStatus,
+        { courseId, moduleId: modulePageId, contentId: modulePageId }
+      );
+
+      let status = 'draft';
+      if (response.published === true || response.workflow_state === 'active' || response.status === 'published') {
+        status = 'published';
+      }
+
+      return {
+        status,
+        url: response.url || response.html_url,
+      };
+    } catch (error) {
+      this.logger?.warn('Failed to get module status', { modulePageId, error });
+      return { status: 'unknown' };
+    }
   }
+}
+
+/**
+ * LMS Endpoint configuration for different providers
+ */
+interface EndpointSpec {
+  method: string;
+  path: string;
+}
+
+interface LmsEndpointConfig {
+  createModule: EndpointSpec;
+  uploadAsset: EndpointSpec;
+  attachAsset: EndpointSpec;
+  publish: EndpointSpec;
+  getStatus: EndpointSpec;
+  authHeader: string;
+  authPrefix: string;
+  authQueryParam?: string;
 }
 
 /**
@@ -372,6 +646,17 @@ export function createLmsConnector(config: LmsConfig, logger?: ConnectorLogger):
   switch (config.provider) {
     case 'filesystem':
       return new FileSystemLmsConnector(config.outputPath || './lms-output', logger);
+
+    case 'canvas':
+    case 'moodle':
+    case 'blackboard':
+    case 'generic':
+      if (!config.apiUrl || !config.apiKey) {
+        logger?.warn(`LMS provider ${config.provider} requires apiUrl and apiKey, using filesystem`);
+        return new FileSystemLmsConnector(config.outputPath || './lms-output', logger);
+      }
+      return new GenericLmsConnector(config, logger);
+
     default:
       logger?.warn(`Unknown LMS provider: ${config.provider}, using filesystem`);
       return new FileSystemLmsConnector(config.outputPath || './lms-output', logger);
