@@ -11,6 +11,7 @@ import { getDatabase } from '../db/connection.js';
 import * as schema from '../db/schema.js';
 import { logger } from '../utils/logger.js';
 import { sha256 } from '../utils/hash.js';
+import { addPipelineJob } from '../queue/index.js';
 
 interface CreateModuleBody {
   title: string;
@@ -274,7 +275,15 @@ export async function moduleRoutes(fastify: FastifyInstance): Promise<void> {
 
     logger.info('Pipeline run started', { runId, moduleId });
 
-    // TODO: Trigger actual pipeline execution via job queue
+    // Add job to queue for background execution
+    await addPipelineJob({
+      type: 'start',
+      runId: run.runId,
+      moduleId: module.moduleId,
+      specId: activeSpec.id,
+      triggeredBy,
+      config,
+    });
 
     return reply.status(201).send({
       success: true,
@@ -282,6 +291,7 @@ export async function moduleRoutes(fastify: FastifyInstance): Promise<void> {
         runId: run.runId,
         state: run.currentState,
         startedAt: run.startedAt,
+        message: 'Pipeline execution queued',
       },
     });
   });
@@ -340,13 +350,27 @@ export async function moduleRoutes(fastify: FastifyInstance): Promise<void> {
       });
     }
 
-    // TODO: Trigger resume via job queue
+    // Get module info for job
+    const module = await db.query.modules.findFirst({
+      where: eq(schema.modules.id, run.moduleId!),
+    });
+
+    // Add resume job to queue
+    await addPipelineJob({
+      type: 'resume',
+      runId: run.runId,
+      moduleId: module?.moduleId || '',
+      specId: run.moduleSpecId!,
+      triggeredBy: 'user',
+      fromState: fromState || run.previousState || undefined,
+    });
 
     return reply.send({
       success: true,
       data: {
         runId: run.runId,
         resumeFromState: fromState || run.previousState,
+        message: 'Resume queued',
       },
     });
   });
@@ -376,13 +400,27 @@ export async function moduleRoutes(fastify: FastifyInstance): Promise<void> {
       });
     }
 
-    // TODO: Trigger rerun via job queue
+    // Get module info for job
+    const module = await db.query.modules.findFirst({
+      where: eq(schema.modules.id, run.moduleId!),
+    });
+
+    // Add rerun job to queue
+    await addPipelineJob({
+      type: 'rerun',
+      runId: run.runId,
+      moduleId: module?.moduleId || '',
+      specId: run.moduleSpecId!,
+      triggeredBy: 'user',
+      fromState,
+    });
 
     return reply.send({
       success: true,
       data: {
         originalRunId: runId,
         rerunFromState: fromState,
+        message: 'Rerun queued',
       },
     });
   });

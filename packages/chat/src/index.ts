@@ -425,3 +425,8 @@ export function createDefaultPolicy(
 
 // Re-exports
 export type { ChatConfig, ChatPolicy, ChatMessage, ChatRequest, ChatResponse };
+
+// Vector stores
+export type { VectorStore } from './index.js';
+export { PgVectorStore, OpenAIEmbeddingProvider, createPgVectorStore } from './vector-stores/pgvector.js';
+export type { PgVectorConfig, EmbeddingProvider } from './vector-stores/pgvector.js';

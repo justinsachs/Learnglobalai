@@ -14,6 +14,8 @@ import { initDatabase, closeDatabase } from './db/connection.js';
 import { logger } from './utils/logger.js';
 import { moduleRoutes } from './routes/modules.js';
 import { chatRoutes } from './routes/chat.js';
+import { startWorker, stopWorker } from './queue/worker.js';
+import { closeQueue } from './queue/index.js';
 
 async function main() {
   const config = loadConfig();
@@ -77,6 +79,13 @@ async function main() {
   // Initialize database
   await initDatabase();
 
+  // Start background worker for pipeline processing
+  const workerEnabled = process.env.WORKER_ENABLED !== 'false';
+  if (workerEnabled) {
+    startWorker();
+    logger.info('Pipeline worker started');
+  }
+
   // Health check
   fastify.get('/health', async () => ({
     status: 'ok',
@@ -107,6 +116,8 @@ async function main() {
   // Graceful shutdown
   const shutdown = async () => {
     logger.info('Shutting down...');
+    await stopWorker();
+    await closeQueue();
     await fastify.close();
     await closeDatabase();
     process.exit(0);
