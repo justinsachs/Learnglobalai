@@ -167,6 +167,7 @@ export interface OrchestratorDependencies {
 
   // Audit
   logAuditEvent: (event: AuditEventInput) => Promise<void>;
+  getAuditEntries: (runId: string) => Promise<AuditEntry[]>;
 
   // Connectors
   contentRepo: ContentRepoConnector;
@@ -302,6 +303,18 @@ export interface Logger {
   warn(msg: string, data?: Record<string, unknown>): void;
   error(msg: string, data?: Record<string, unknown>): void;
   debug(msg: string, data?: Record<string, unknown>): void;
+}
+
+/**
+ * Audit entry returned from storage
+ */
+export interface AuditEntry {
+  eventType: string;
+  actor: string;
+  fromState?: string;
+  toState?: string;
+  timestamp: string;
+  details?: Record<string, unknown>;
 }
 
 /**

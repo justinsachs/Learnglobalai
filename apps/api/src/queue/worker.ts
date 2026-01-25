@@ -280,6 +280,30 @@ function createDependencies(): OrchestratorDependencies {
         details: event.details,
       });
     },
+
+    async getAuditEntries(runId: string) {
+      const run = await db.query.runs.findFirst({
+        where: eq(schema.runs.runId, runId),
+      });
+
+      if (!run) {
+        return [];
+      }
+
+      const events = await db.query.auditEvents.findMany({
+        where: eq(schema.auditEvents.runId, run.id),
+        orderBy: (auditEvents, { asc }) => [asc(auditEvents.timestamp)],
+      });
+
+      return events.map(e => ({
+        eventType: e.eventType,
+        actor: e.actor || 'system',
+        fromState: e.fromState || undefined,
+        toState: e.toState || undefined,
+        timestamp: e.timestamp?.toISOString() || new Date().toISOString(),
+        details: e.details as Record<string, unknown> | undefined,
+      }));
+    },
   };
 }
 

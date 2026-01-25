@@ -22,6 +22,13 @@ export async function handleAuditFinalized(
     const endTime = Date.now();
     const totalDurationMs = endTime - startTime;
 
+    // Load audit entries from storage
+    const auditEntries = await deps.getAuditEntries(context.runId);
+
+    // Generate and store markdown version for size/hash calculation
+    const sourcePackMarkdown = context.sourcePack ? generateSourcePackMarkdown(context.sourcePack) : '';
+    const markdownHash = sourcePackMarkdown ? hashObject(sourcePackMarkdown) : '';
+
     // Build complete asset manifest
     const assetManifest: AssetManifest = {
       moduleId: spec.moduleId,
@@ -75,10 +82,10 @@ export async function handleAuditFinalized(
           type: 'sourcepack_markdown',
           uri: `${spec.vertical}/${spec.moduleId}/${spec.version}/${context.runId}/sourcepack.md`,
           contentType: 'text/markdown',
-          sizeBytes: 0, // Would be computed from actual file
+          sizeBytes: Buffer.byteLength(sourcePackMarkdown, 'utf8'),
           hash: {
             algorithm: 'sha256',
-            hash: '',
+            hash: markdownHash,
             computedAt: new Date().toISOString(),
           },
           generatedAt: new Date().toISOString(),
@@ -183,7 +190,14 @@ export async function handleAuditFinalized(
       },
 
       audit: {
-        entries: [], // Would be populated from audit events table
+        entries: auditEntries.map(e => ({
+          timestamp: e.timestamp,
+          eventType: e.eventType,
+          actor: e.actor,
+          fromState: e.fromState,
+          toState: e.toState,
+          details: e.details,
+        })),
         hashes: {
           moduleSpec: {
             algorithm: 'sha256',
@@ -274,4 +288,109 @@ export async function handleAuditFinalized(
       },
     };
   }
+}
+
+/**
+ * Generate markdown from sourcepack for storage and hashing
+ */
+function generateSourcePackMarkdown(sourcePack: import('@learnglobal/contracts').SourcePack): string {
+  const lines: string[] = [];
+
+  lines.push(`# ${sourcePack.title}`);
+  lines.push('');
+  lines.push(`**Version:** ${sourcePack.version}`);
+  lines.push(`**Generated:** ${sourcePack.generatedAt}`);
+  lines.push('');
+
+  // Generate sections recursively
+  const generateSection = (section: typeof sourcePack.sections[0], level: number): void => {
+    const heading = '#'.repeat(Math.min(level + 1, 6));
+    lines.push(`${heading} ${section.heading}`);
+    lines.push('');
+    lines.push(section.fullProseText);
+    lines.push('');
+
+    // Add traceability
+    if (section.traceability.length > 0) {
+      lines.push('**Standards Referenced:**');
+      for (const trace of section.traceability) {
+        lines.push(`- ${trace.standardName} (${trace.sectionRef})`);
+      }
+      lines.push('');
+    }
+
+    // Add embedded scenarios
+    if (section.embeddedScenarios) {
+      for (const scenario of section.embeddedScenarios) {
+        lines.push(`#### Scenario: ${scenario.title}`);
+        lines.push('');
+        lines.push(scenario.content);
+        lines.push('');
+        if (scenario.dialogue) {
+          lines.push('**Dialogue:**');
+          for (const line of scenario.dialogue) {
+            lines.push(`> **${line.speaker}:** ${line.text}`);
+          }
+          lines.push('');
+        }
+      }
+    }
+
+    // Add embedded checklists
+    if (section.embeddedChecklists) {
+      for (const checklist of section.embeddedChecklists) {
+        lines.push(`#### Checklist: ${checklist.title}`);
+        lines.push('');
+        for (const item of checklist.items) {
+          lines.push(`- [ ] ${item.text}${item.note ? ` _(${item.note})_` : ''}`);
+        }
+        lines.push('');
+      }
+    }
+
+    // Process children
+    if (section.children) {
+      for (const child of section.children) {
+        generateSection(child, level + 1);
+      }
+    }
+  };
+
+  for (const section of sourcePack.sections) {
+    generateSection(section, 1);
+  }
+
+  // Add glossary
+  if (sourcePack.glossary && sourcePack.glossary.length > 0) {
+    lines.push('## Glossary');
+    lines.push('');
+    for (const term of sourcePack.glossary) {
+      lines.push(`**${term.term}:** ${term.definition}`);
+    }
+    lines.push('');
+  }
+
+  // Add references
+  if (sourcePack.references && sourcePack.references.length > 0) {
+    lines.push('## References');
+    lines.push('');
+    for (const ref of sourcePack.references) {
+      lines.push(`- ${ref.citation}${ref.url ? ` [Link](${ref.url})` : ''}`);
+    }
+    lines.push('');
+  }
+
+  // Add disclaimers
+  if (sourcePack.disclaimers && sourcePack.disclaimers.length > 0) {
+    lines.push('---');
+    lines.push('');
+    lines.push('**Disclaimers:**');
+    lines.push('');
+    for (const disclaimer of sourcePack.disclaimers) {
+      lines.push(`_${disclaimer}_`);
+    }
+    lines.push('');
+  }
+
+  return lines.join('\n');
 }
