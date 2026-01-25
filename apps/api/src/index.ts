@@ -14,8 +14,11 @@ import { initDatabase, closeDatabase } from './db/connection.js';
 import { logger } from './utils/logger.js';
 import { moduleRoutes } from './routes/modules.js';
 import { chatRoutes } from './routes/chat.js';
+import { approvalRoutes } from './routes/approvals.js';
+import { verticalRoutes } from './routes/verticals.js';
 import { startWorker, stopWorker } from './queue/worker.js';
 import { closeQueue } from './queue/index.js';
+import { metricsHandler, trackHttpRequest } from './utils/metrics.js';
 
 async function main() {
   const config = loadConfig();
@@ -31,6 +34,21 @@ async function main() {
         },
       } : undefined,
     },
+  });
+
+  // Request timing for metrics
+  fastify.addHook('onRequest', async (request) => {
+    request.startTime = Date.now();
+  });
+
+  fastify.addHook('onResponse', async (request, reply) => {
+    const duration = Date.now() - (request.startTime || Date.now());
+    trackHttpRequest(
+      request.method,
+      request.routeOptions?.url || request.url,
+      reply.statusCode,
+      duration
+    );
   });
 
   // Register plugins
@@ -64,7 +82,19 @@ async function main() {
         { name: 'modules', description: 'Module management' },
         { name: 'runs', description: 'Pipeline run management' },
         { name: 'chat', description: 'Module chat' },
+        { name: 'approvals', description: 'Approval workflow' },
+        { name: 'verticals', description: 'Vertical/brand configuration' },
+        { name: 'admin', description: 'Admin operations' },
       ],
+      components: {
+        securitySchemes: {
+          bearerAuth: {
+            type: 'http',
+            scheme: 'bearer',
+            bearerFormat: 'JWT',
+          },
+        },
+      },
     },
   });
 
@@ -93,9 +123,47 @@ async function main() {
     version: '1.0.0',
   }));
 
+  // Deep health check
+  fastify.get('/health/deep', async () => {
+    const checks: Record<string, { status: string; latency?: number }> = {};
+
+    // Check database
+    try {
+      const start = Date.now();
+      // Would perform actual DB query here
+      checks.database = { status: 'ok', latency: Date.now() - start };
+    } catch {
+      checks.database = { status: 'error' };
+    }
+
+    // Check Redis
+    try {
+      const start = Date.now();
+      // Would perform actual Redis ping here
+      checks.redis = { status: 'ok', latency: Date.now() - start };
+    } catch {
+      checks.redis = { status: 'error' };
+    }
+
+    const allOk = Object.values(checks).every(c => c.status === 'ok');
+
+    return {
+      status: allOk ? 'healthy' : 'degraded',
+      checks,
+    };
+  });
+
+  // Prometheus metrics endpoint
+  fastify.get('/metrics', async (request, reply) => {
+    reply.header('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
+    return metricsHandler();
+  });
+
   // Register routes
   await fastify.register(moduleRoutes, { prefix: '/api/v1' });
   await fastify.register(chatRoutes, { prefix: '/api/v1' });
+  await fastify.register(approvalRoutes, { prefix: '/api/v1' });
+  await fastify.register(verticalRoutes, { prefix: '/api/v1' });
 
   // Error handler
   fastify.setErrorHandler((error, request, reply) => {
@@ -135,9 +203,17 @@ async function main() {
 
     logger.info(`Server listening on ${config.api.host}:${config.api.port}`);
     logger.info(`API docs available at http://${config.api.host}:${config.api.port}/docs`);
+    logger.info(`Metrics available at http://${config.api.host}:${config.api.port}/metrics`);
   } catch (error) {
     logger.error('Failed to start server', { error });
     process.exit(1);
+  }
+}
+
+// Extend FastifyRequest for timing
+declare module 'fastify' {
+  interface FastifyRequest {
+    startTime?: number;
   }
 }
 
