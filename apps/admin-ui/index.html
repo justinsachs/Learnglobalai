@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LearnGlobal.ai Admin</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#1a73e8',
+            secondary: '#4285f4',
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+  <nav class="bg-white shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between h-16">
+        <div class="flex">
+          <div class="flex-shrink-0 flex items-center">
+            <h1 class="text-xl font-bold text-primary">LearnGlobal.ai</h1>
+          </div>
+          <div class="hidden sm:ml-6 sm:flex sm:space-x-8">
+            <a href="#" class="border-primary text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+              Modules
+            </a>
+            <a href="#" class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+              Runs
+            </a>
+            <a href="#" class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+              Settings
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+    <!-- Dashboard Header -->
+    <div class="px-4 py-6 sm:px-0">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-semibold text-gray-900">Training Modules</h2>
+        <button onclick="showCreateModal()" class="bg-primary hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg">
+          + Create Module
+        </button>
+      </div>
+
+      <!-- Modules List -->
+      <div id="modules-list" class="bg-white shadow rounded-lg">
+        <div class="p-6 text-center text-gray-500">
+          Loading modules...
+        </div>
+      </div>
+    </div>
+
+    <!-- Run Status Section -->
+    <div class="px-4 py-6 sm:px-0">
+      <h2 class="text-2xl font-semibold text-gray-900 mb-6">Recent Runs</h2>
+      <div id="runs-list" class="bg-white shadow rounded-lg">
+        <div class="p-6 text-center text-gray-500">
+          Loading runs...
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Create Module Modal -->
+  <div id="create-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center">
+    <div class="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+      <h3 class="text-lg font-semibold mb-4">Create New Training Module</h3>
+      <form id="create-form" onsubmit="createModule(event)">
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Title</label>
+            <input type="text" name="title" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm p-2 border">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Description</label>
+            <textarea name="description" rows="3" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm p-2 border"></textarea>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Vertical/Brand</label>
+            <select name="vertical" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm p-2 border">
+              <option value="medviro">MedViro</option>
+              <option value="clearclaims">ClearClaims</option>
+              <option value="response-roofing">Response Roofing</option>
+              <option value="learnglobal">LearnGlobal (Generic)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Author</label>
+            <input type="text" name="author" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm p-2 border">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Learning Objectives (one per line)</label>
+            <textarea name="objectives" rows="4" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm p-2 border font-mono text-sm" placeholder="Understand the fundamentals of...
+Apply proper procedures for...
+Demonstrate compliance with..."></textarea>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Source Materials (URLs or upload)</label>
+            <textarea name="sources" rows="2" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm p-2 border" placeholder="Paste links to reference documents, SOPs, or standards..."></textarea>
+          </div>
+        </div>
+        <div class="mt-6 flex justify-end space-x-3">
+          <button type="button" onclick="hideCreateModal()" class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
+            Cancel
+          </button>
+          <button type="submit" class="px-4 py-2 bg-primary text-white rounded-md text-sm font-medium hover:bg-blue-700">
+            Create Module
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const API_URL = 'http://localhost:3000/api/v1';
+
+    async function loadModules() {
+      try {
+        const response = await fetch(`${API_URL}/modules`);
+        const data = await response.json();
+
+        if (data.success && data.data.length > 0) {
+          const html = data.data.map(module => `
+            <div class="p-4 border-b last:border-b-0 flex justify-between items-center">
+              <div>
+                <h3 class="font-medium text-gray-900">${module.title}</h3>
+                <p class="text-sm text-gray-500">${module.vertical} | v${module.currentVersion} | ${module.status}</p>
+              </div>
+              <div class="flex space-x-2">
+                <button onclick="viewModule('${module.moduleId}')" class="px-3 py-1 text-sm border rounded hover:bg-gray-50">View</button>
+                <button onclick="startRun('${module.moduleId}')" class="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700">Start Run</button>
+              </div>
+            </div>
+          `).join('');
+          document.getElementById('modules-list').innerHTML = html;
+        } else {
+          document.getElementById('modules-list').innerHTML = '<div class="p-6 text-center text-gray-500">No modules yet. Create your first module to get started.</div>';
+        }
+      } catch (error) {
+        document.getElementById('modules-list').innerHTML = '<div class="p-6 text-center text-red-500">Failed to load modules. Make sure the API is running.</div>';
+      }
+    }
+
+    async function loadRuns() {
+      try {
+        const response = await fetch(`${API_URL}/modules`);
+        const modulesData = await response.json();
+
+        // This would need a /runs endpoint - simplified for now
+        document.getElementById('runs-list').innerHTML = '<div class="p-6 text-center text-gray-500">Pipeline runs will appear here after starting a module run.</div>';
+      } catch (error) {
+        document.getElementById('runs-list').innerHTML = '<div class="p-6 text-center text-red-500">Failed to load runs.</div>';
+      }
+    }
+
+    function showCreateModal() {
+      document.getElementById('create-modal').classList.remove('hidden');
+    }
+
+    function hideCreateModal() {
+      document.getElementById('create-modal').classList.add('hidden');
+    }
+
+    async function createModule(event) {
+      event.preventDefault();
+      const form = event.target;
+      const formData = new FormData(form);
+
+      const objectives = formData.get('objectives').split('\n').filter(o => o.trim());
+
+      const moduleData = {
+        title: formData.get('title'),
+        description: formData.get('description'),
+        vertical: formData.get('vertical'),
+        author: formData.get('author'),
+        spec: {
+          moduleId: 'mod-' + Date.now(),
+          title: formData.get('title'),
+          vertical: formData.get('vertical'),
+          version: '1.0.0',
+          author: formData.get('author'),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          description: formData.get('description'),
+          targetAudienceRoles: ['technician', 'supervisor'],
+          learningObjectives: objectives,
+          standardsMap: [],
+          scenarios: [],
+          requiredArtifacts: [],
+          constraints: {
+            minWordsPerMajorHeading: 500,
+            minTotalWords: 5000,
+            maxBulletRatio: 0.08,
+            forbiddenFormattingRules: [],
+            requiredDisclaimers: ['This training is for educational purposes only.']
+          },
+          safetyBoundaries: {
+            scopeOfAdvice: 'This training covers general procedures and compliance requirements.',
+            disclaimers: ['Always follow your organization\'s specific protocols.'],
+            escalationTriggers: []
+          },
+          mediaPreferences: {
+            videoMinutesTarget: 10,
+            avatarStyle: 'professional',
+            audioTone: 'conversational',
+            infographicStyle: 'modern'
+          }
+        }
+      };
+
+      try {
+        const response = await fetch(`${API_URL}/modules`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(moduleData)
+        });
+
+        const data = await response.json();
+        if (data.success) {
+          hideCreateModal();
+          form.reset();
+          loadModules();
+          alert('Module created successfully!');
+        } else {
+          alert('Error: ' + (data.error || 'Failed to create module'));
+        }
+      } catch (error) {
+        alert('Failed to create module: ' + error.message);
+      }
+    }
+
+    async function startRun(moduleId) {
+      if (!confirm('Start a new pipeline run for this module?')) return;
+
+      try {
+        const response = await fetch(`${API_URL}/modules/${moduleId}/runs`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            triggeredBy: 'admin-ui',
+            config: { autoApprove: true }
+          })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+          alert(`Run started: ${data.data.runId}`);
+          loadRuns();
+        } else {
+          alert('Error: ' + (data.error || 'Failed to start run'));
+        }
+      } catch (error) {
+        alert('Failed to start run: ' + error.message);
+      }
+    }
+
+    function viewModule(moduleId) {
+      alert('View module: ' + moduleId + '\n\nFull module viewer coming soon.');
+    }
+
+    // Load data on page load
+    loadModules();
+    loadRuns();
+  </script>
+</body>
+</html>
