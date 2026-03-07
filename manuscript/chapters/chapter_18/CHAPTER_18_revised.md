@@ -82,7 +82,7 @@ In today’s fast-moving economy, the ability to learn and adapt is the ultimate
 
 The shift to Adaptive Education™ requires a new role for the Learning and Development (L&D) function.
 
-L&D is no longer in the business of creating and delivering courses. They are in the business of **building and managing the competence engine**.
+L&D is no longer in the business of creating and delivering courses. They are in the business of building and managing the **Learning Factory**—the integrated system of people, processes, and technology that produces verified competence at scale.
 
 Their job is to:
 

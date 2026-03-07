@@ -56,7 +56,7 @@ It's not enough to say a student has mastered a competency; you have to **prove 
 
 This is where the **Proof Hour** comes in.
 
-A **Proof Hour** is a unit of verified competence, a claim backed by a portfolio of evidence in their Competence Ledger.
+A **Proof Hour** is not time spent learning. It is documented evidence that a learner can perform a specific skill under defined conditions. The evidence might include a completed project, a simulation result, a supervisor evaluation, or a verified portfolio artifact.
 
 - A **Credit Hour** says, "You sat in a chair for 15 hours."
 - A **Proof Hour** says, "You proved you can do X, and here's the evidence."
