@@ -1,0 +1,284 @@
+{
+  "moduleId": "medviro-respiratory-protection-101",
+  "title": "Respiratory Protection Program Fundamentals",
+  "vertical": "medviro",
+  "version": "1.0.0",
+  "author": "MedViro Training Team",
+  "createdAt": "2024-01-15T00:00:00.000Z",
+  "updatedAt": "2024-01-15T00:00:00.000Z",
+  "description": "A comprehensive training module covering the fundamentals of respiratory protection programs in healthcare and laboratory settings. This module ensures compliance with OSHA 1910.134 and industry best practices for respiratory hazard assessment, equipment selection, fit testing, and ongoing program management.",
+  "targetAudienceRoles": [
+    "technician",
+    "supervisor",
+    "compliance-officer"
+  ],
+  "learningObjectives": [
+    "Explain the purpose and regulatory basis of respiratory protection programs",
+    "Identify common respiratory hazards in healthcare and laboratory environments",
+    "Describe the process for selecting appropriate respiratory protection equipment",
+    "Demonstrate proper donning, doffing, and user seal check procedures for N95 respirators",
+    "Explain the requirements for medical evaluation and fit testing",
+    "Describe the maintenance, storage, and inspection requirements for respirators",
+    "Identify situations requiring immediate escalation to safety personnel"
+  ],
+  "standardsMap": [
+    {
+      "standardName": "OSHA 1910.134",
+      "sectionRef": "Section (a) - Permissible Practice",
+      "requirementSummary": "Employers must provide respirators when necessary to protect employee health and establish a respiratory protection program.",
+      "fullText": "In the control of those occupational diseases caused by breathing air contaminated with harmful dusts, fogs, fumes, mists, gases, smokes, sprays, or vapors, the primary objective shall be to prevent atmospheric contamination."
+    },
+    {
+      "standardName": "OSHA 1910.134",
+      "sectionRef": "Section (c) - Respiratory Protection Program",
+      "requirementSummary": "Written procedures and program elements including worksite-specific procedures, selection of respirators, medical evaluations, fit testing, and training.",
+      "sourceUrl": "https://www.osha.gov/laws-regs/regulations/standardnumber/1910/1910.134"
+    },
+    {
+      "standardName": "OSHA 1910.134",
+      "sectionRef": "Section (d) - Selection of Respirators",
+      "requirementSummary": "Employers must select and provide appropriate NIOSH-certified respirators based on respiratory hazard(s) and workplace conditions."
+    },
+    {
+      "standardName": "OSHA 1910.134",
+      "sectionRef": "Section (e) - Medical Evaluation",
+      "requirementSummary": "Medical evaluation must be provided to determine employee's ability to use a respirator before fit testing and use."
+    },
+    {
+      "standardName": "OSHA 1910.134",
+      "sectionRef": "Section (f) - Fit Testing",
+      "requirementSummary": "Employees using tight-fitting facepiece respirators must be fit tested prior to initial use, whenever a different respirator is used, and at least annually thereafter."
+    },
+    {
+      "standardName": "CDC/NIOSH",
+      "sectionRef": "N95 Respirator Guidance",
+      "requirementSummary": "N95 respirators must be NIOSH-approved, properly fitted, and used in accordance with manufacturer instructions for healthcare settings."
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "scenario-spill-response",
+      "title": "Chemical Spill in the Laboratory",
+      "context": "You are working in a clinical laboratory when a coworker accidentally knocks over a container of formaldehyde solution. The spill is approximately 500ml and vapor is visible rising from the liquid.",
+      "learnerRole": "technician",
+      "decisionPoints": [
+        {
+          "id": "dp-1",
+          "situation": "What is your immediate first action?",
+          "options": [
+            {
+              "id": "opt-1a",
+              "text": "Immediately attempt to clean up the spill with paper towels",
+              "isCorrect": false,
+              "explanation": "Incorrect. Attempting to clean a chemical spill without proper PPE could expose you to harmful vapors. Safety first."
+            },
+            {
+              "id": "opt-1b",
+              "text": "Alert nearby colleagues and evacuate the immediate area",
+              "isCorrect": true,
+              "explanation": "Correct. The first priority is to ensure everyone's safety by alerting others and moving away from the spill zone."
+            },
+            {
+              "id": "opt-1c",
+              "text": "Continue working as it's a small spill",
+              "isCorrect": false,
+              "explanation": "Incorrect. Formaldehyde is a known carcinogen and respiratory irritant. Even small spills require proper response."
+            }
+          ],
+          "consequences": "After evacuating, you need to determine the appropriate respiratory protection for the cleanup team."
+        },
+        {
+          "id": "dp-2",
+          "situation": "The EHS team arrives and asks you to assist with cleanup. What respiratory protection should the cleanup team use?",
+          "options": [
+            {
+              "id": "opt-2a",
+              "text": "Standard surgical masks are sufficient",
+              "isCorrect": false,
+              "explanation": "Incorrect. Surgical masks do not provide protection against chemical vapors."
+            },
+            {
+              "id": "opt-2b",
+              "text": "N95 respirators",
+              "isCorrect": false,
+              "explanation": "Incorrect. N95 respirators are particulate respirators and do not protect against chemical vapors like formaldehyde."
+            },
+            {
+              "id": "opt-2c",
+              "text": "Chemical cartridge respirators with organic vapor cartridges",
+              "isCorrect": true,
+              "explanation": "Correct. Formaldehyde requires a respirator with organic vapor cartridges (OV) rated for formaldehyde exposure."
+            }
+          ]
+        }
+      ],
+      "objectivesAddressed": ["1", "2", "3"],
+      "standardsAddressed": ["OSHA 1910.134 Section (d)"]
+    },
+    {
+      "id": "scenario-fit-test",
+      "title": "Annual Fit Test Preparation",
+      "context": "It's time for your annual respirator fit test. You've been using an N95 respirator for the past year in the tuberculosis clinic.",
+      "learnerRole": "technician",
+      "decisionPoints": [
+        {
+          "id": "dp-3",
+          "situation": "Before your fit test, the occupational health nurse asks if you've had any changes since last year. Which of the following would NOT require a new fit test?",
+          "options": [
+            {
+              "id": "opt-3a",
+              "text": "You've lost 25 pounds",
+              "isCorrect": false,
+              "explanation": "Significant weight loss (or gain) can change facial structure and require a new fit test."
+            },
+            {
+              "id": "opt-3b",
+              "text": "You had dental work that changed your jaw alignment",
+              "isCorrect": false,
+              "explanation": "Dental procedures affecting jaw structure can impact respirator fit and require retesting."
+            },
+            {
+              "id": "opt-3c",
+              "text": "You got a new haircut",
+              "isCorrect": true,
+              "explanation": "Correct. A haircut does not affect facial structure and does not require a new fit test."
+            },
+            {
+              "id": "opt-3d",
+              "text": "You had reconstructive surgery after a car accident",
+              "isCorrect": false,
+              "explanation": "Facial surgery can significantly change the fit surface and requires a new fit test."
+            }
+          ]
+        }
+      ],
+      "objectivesAddressed": ["5"],
+      "standardsAddressed": ["OSHA 1910.134 Section (f)"]
+    }
+  ],
+  "requiredArtifacts": [
+    {
+      "id": "checklist-daily-inspection",
+      "type": "checklist",
+      "description": "Daily respirator inspection checklist for healthcare workers to verify equipment integrity before each use",
+      "passCriteria": [
+        "Includes visual inspection steps for facepiece, straps, and valve",
+        "Includes user seal check procedure",
+        "Includes criteria for when to replace the respirator"
+      ],
+      "targetSection": "Maintenance and Inspection"
+    },
+    {
+      "id": "checklist-fit-test-prep",
+      "type": "checklist",
+      "description": "Fit test preparation checklist covering activities to avoid before testing",
+      "passCriteria": [
+        "Lists foods and beverages to avoid",
+        "Specifies time requirements",
+        "Includes facial hair requirements"
+      ],
+      "targetSection": "Fit Testing"
+    },
+    {
+      "id": "form-medical-clearance",
+      "type": "form",
+      "description": "Simplified medical questionnaire reference showing the categories of questions asked during medical evaluation",
+      "passCriteria": [
+        "References OSHA Appendix C questionnaire",
+        "Explains confidentiality requirements",
+        "Describes the clearance process"
+      ],
+      "targetSection": "Medical Evaluation"
+    },
+    {
+      "id": "decision-tree-respirator-selection",
+      "type": "decision-tree",
+      "description": "Visual decision guide for selecting appropriate respirator type based on hazard",
+      "passCriteria": [
+        "Distinguishes between particulate and gas/vapor hazards",
+        "Includes IDLH considerations",
+        "References APF requirements"
+      ],
+      "targetSection": "Respirator Selection"
+    }
+  ],
+  "constraints": {
+    "minWordsPerMajorHeading": 600,
+    "minTotalWords": 6000,
+    "maxBulletRatio": 0.08,
+    "forbiddenFormattingRules": [
+      "No more than 3 consecutive bullet points without prose explanation",
+      "All checklists must have introductory and closing prose paragraphs",
+      "Scenarios must be written as flowing narrative, not bullet points"
+    ],
+    "requiredDisclaimers": [
+      "This training module is for educational purposes only and does not replace hands-on training with qualified instructors.",
+      "Always follow your facility's specific respiratory protection program and consult with your supervisor or EHS department for site-specific requirements.",
+      "Medical fitness for respirator use must be determined by a licensed healthcare professional (PLHCP)."
+    ],
+    "requiredSections": [
+      "Introduction",
+      "Regulatory Framework",
+      "Hazard Assessment",
+      "Respirator Selection",
+      "Medical Evaluation",
+      "Fit Testing",
+      "Use and Maintenance",
+      "Summary"
+    ]
+  },
+  "safetyBoundaries": {
+    "scopeOfAdvice": "This training provides general educational information about respiratory protection programs. It covers regulatory requirements, equipment selection principles, and proper use procedures. It does NOT provide medical advice, specific hazard assessments for individual workplaces, or substitute for hands-on training with actual equipment.",
+    "disclaimers": [
+      "This training does not constitute medical advice. Consult a licensed healthcare professional for medical fitness determinations.",
+      "Specific respiratory protection requirements vary by workplace hazard. Conduct a proper exposure assessment for your facility.",
+      "Always verify that respirators are NIOSH-approved for your specific application."
+    ],
+    "escalationTriggers": [
+      "Any questions about specific medical conditions and respirator use",
+      "Requests for specific exposure assessment guidance",
+      "Questions about emergency/IDLH situations",
+      "Legal or liability questions"
+    ],
+    "prohibitedTopics": [
+      "Specific medical diagnoses",
+      "Legal liability advice",
+      "Specific product recommendations over others",
+      "Emergency response procedures (beyond general awareness)"
+    ],
+    "sensitiveTopics": [
+      "Pre-existing respiratory conditions",
+      "Pregnancy and respirator use",
+      "Reasonable accommodations"
+    ]
+  },
+  "mediaPreferences": {
+    "videoMinutesTarget": 12,
+    "avatarStyle": "professional healthcare setting",
+    "audioTone": "authoritative yet approachable, clinical setting appropriate",
+    "infographicStyle": "clean medical/scientific style with blue and white color scheme",
+    "colorScheme": {
+      "primary": "#1a73e8",
+      "secondary": "#4285f4",
+      "accent": "#34a853"
+    },
+    "backgroundMusic": "none",
+    "pacing": "moderate"
+  },
+  "prerequisites": [],
+  "estimatedDurationMinutes": 45,
+  "tags": [
+    "respiratory protection",
+    "PPE",
+    "OSHA compliance",
+    "healthcare safety",
+    "N95",
+    "fit testing"
+  ],
+  "metadata": {
+    "regulatoryReviewDate": "2024-01-10",
+    "smeReviewer": "Dr. Jane Smith, CIH",
+    "targetCompletionRate": 0.95,
+    "assessmentPassRate": 0.80
+  }
+}

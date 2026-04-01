@@ -1,0 +1,14 @@
+# Admin UI Dockerfile (placeholder - minimal static server)
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Simple static server for development
+RUN npm install -g serve
+
+# Copy admin UI files
+COPY apps/admin-ui/ ./
+
+EXPOSE 3001
+
+CMD ["serve", "-s", ".", "-l", "3001"]

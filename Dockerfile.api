@@ -1,0 +1,60 @@
+# API Server Dockerfile
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Install dependencies
+COPY package*.json ./
+COPY turbo.json ./
+COPY tsconfig.base.json ./
+COPY packages/contracts/package.json ./packages/contracts/
+COPY packages/orchestrator/package.json ./packages/orchestrator/
+COPY packages/llm/package.json ./packages/llm/
+COPY packages/connectors/package.json ./packages/connectors/
+COPY packages/chat/package.json ./packages/chat/
+COPY apps/api/package.json ./apps/api/
+
+RUN npm install
+
+# Copy source code
+COPY packages/ ./packages/
+COPY apps/api/ ./apps/api/
+
+# Build
+RUN npm run build --workspace=@learnglobal/contracts
+RUN npm run build --workspace=@learnglobal/orchestrator
+RUN npm run build --workspace=@learnglobal/llm
+RUN npm run build --workspace=@learnglobal/connectors
+RUN npm run build --workspace=@learnglobal/chat
+RUN npm run build --workspace=@learnglobal/api
+
+# Production image
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copy built artifacts
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/packages/contracts/dist ./packages/contracts/dist
+COPY --from=builder /app/packages/contracts/package.json ./packages/contracts/
+COPY --from=builder /app/packages/orchestrator/dist ./packages/orchestrator/dist
+COPY --from=builder /app/packages/orchestrator/package.json ./packages/orchestrator/
+COPY --from=builder /app/packages/llm/dist ./packages/llm/dist
+COPY --from=builder /app/packages/llm/package.json ./packages/llm/
+COPY --from=builder /app/packages/connectors/dist ./packages/connectors/dist
+COPY --from=builder /app/packages/connectors/package.json ./packages/connectors/
+COPY --from=builder /app/packages/chat/dist ./packages/chat/dist
+COPY --from=builder /app/packages/chat/package.json ./packages/chat/
+COPY --from=builder /app/apps/api/dist ./apps/api/dist
+COPY --from=builder /app/apps/api/package.json ./apps/api/
+COPY --from=builder /app/apps/api/src/db/migrations ./apps/api/src/db/migrations
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
+RUN mkdir -p /app/lms-output && chown -R nodejs:nodejs /app
+USER nodejs
+
+EXPOSE 3000
+
+CMD ["node", "apps/api/dist/index.js"]
